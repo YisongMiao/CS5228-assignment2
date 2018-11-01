@@ -40,6 +40,7 @@ class MyGradientBoostingRegressor():
         self.estimators = np.empty((self.n_estimators,), dtype=np.object)
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
+        self.start_point = None
 
     def fit(self, X, y):
         '''
@@ -53,6 +54,7 @@ class MyGradientBoostingRegressor():
         tree.fit(X, y)
         f_prev = np.empty(y.shape)
         f_prev.fill(np.mean(y))
+        self.start_point = np.mean(y)
 
         #print('y_pred is: {}'.format(y_pred))
         #print('y_true is: {}'.format(y))
@@ -94,8 +96,8 @@ class MyGradientBoostingRegressor():
             #print('additive: {}'.format(additive))
             #print('f_prev: {}'.format(f_prev))
 
-    def predict_instance(self, instance, y):
-        y_pred = np.mean(y)
+    def predict_instance(self, instance):
+        y_pred = self.start_point
         for i in range(len(self.estimators)):
             track = []
             explore(self.estimators[i].root, instance, track)
@@ -105,7 +107,7 @@ class MyGradientBoostingRegressor():
             y_pred += cm
         return y_pred
 
-    def predict(self, X, y):
+    def predict(self, X):
         '''
         :param X: Feature data, type: numpy array, shape: (N, num_feature)
         :return: y_pred: Predicted label, type: numpy array, shape: (N,)
@@ -113,7 +115,7 @@ class MyGradientBoostingRegressor():
         answer = []
         for i in range(X.shape[0]):
             instance = X[i, :]
-            pred = self.predict_instance(instance, y)
+            pred = self.predict_instance(instance)
             answer.append(pred)
         return np.array(answer)
 
@@ -155,7 +157,7 @@ if __name__ == '__main__':
             for k in range(len(model_string)):
                 print('#{} tree: {}'.format(k, operator.eq(model_string[str(k)], test_model_string[str(k)])))
 
-            y_pred = gbr.predict(x_train, y_train)
+            y_pred = gbr.predict(x_train)
 
             gbr.save_model_to_json('test.json')
 
