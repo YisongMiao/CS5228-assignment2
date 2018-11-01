@@ -2,6 +2,7 @@ import numpy as np
 import os
 import json
 import operator
+from collections import defaultdict
 
 
 def calculate_error(array):
@@ -11,6 +12,11 @@ def calculate_error(array):
 
 
 def split(root, max_depth, min_samples_split, candidate_X, candidate_y, original_X):
+    temp_X = np.empty((original_X.shape[0], original_X.shape[1]))
+    for j in range(original_X.shape[1]):
+        column = original_X[:, j]
+        temp_X[:, j] = np.sort(column)
+    original_X = temp_X
     criteria_dict = dict()
     #print('candidate_X shape: {}'.format(candidate_X.shape))
     for j in range(original_X.shape[1]):
@@ -27,9 +33,11 @@ def split(root, max_depth, min_samples_split, candidate_X, candidate_y, original
                 total_error += calculate_error(candidate_y[item])
             criteria_dict[(j, s)] = total_error
     sorted_dict = sorted(criteria_dict.items(), key=operator.itemgetter(1), reverse=False)
+    #print('first 10 element of sorted_dict is: {}'.format(sorted_dict[: 10]))
+    #sorted_dict = sorted(sorted_dict, key=lambda x: (x[1]))
+    #print('first 10 element of sorted_dict is: {}'.format(sorted_dict[: 10]))
     #print('length of sorted dict is: {}'.format(len(sorted_dict)))
-    #print(sorted_dict[: 10])
-    #print(original_X[sorted_dict[0][0]])
+
     j = sorted_dict[0][0][0]
     s = sorted_dict[0][0][1]
     threshould = original_X[s, j]
@@ -70,17 +78,30 @@ def split(root, max_depth, min_samples_split, candidate_X, candidate_y, original
                 split(root['right'], max_depth, min_samples_split, current_candidate_X, current_candidate_y, original_X)
 
 
-def explore(root, instance):
+def explore(root, instance, track):
     j = root['splitting_variable']
     threshould = root['splitting_threshold']
     if instance[j] <= threshould:
         current_root = root['left']
+        track.append('l')
     else:
         current_root = root['right']
+        track.append('r')
     if isinstance(current_root, dict) is False:  # means it is a leaf node
         return current_root
     else:  # means it is a internal node
-        return explore(current_root, instance)
+        return explore(current_root, instance, track)
+
+
+def delete_depth(root):
+    if 'depth' in root:
+        del root['depth']
+    if isinstance(root['left'], dict) is True:
+        c_root = root['left']
+        delete_depth(c_root)
+    if isinstance(root['right'], dict) is True:
+        c_root = root['right']
+        delete_depth(c_root)
 
 
 class MyDecisionTreeRegressor():
@@ -101,6 +122,7 @@ class MyDecisionTreeRegressor():
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.root = None
+        self.track_dict = defaultdict(lambda: defaultdict())
 
     def fit(self, X, y):
         '''
@@ -112,8 +134,8 @@ class MyDecisionTreeRegressor():
         '''
         self.root = dict()
         self.root['depth'] = 1
-        print('min_samples_split is: {}'.format(self.min_samples_split))
         split(self.root, self.max_depth, self.min_samples_split, X, y, X)
+        delete_depth(self.root)
 
     def predict(self, X):
         '''
@@ -122,10 +144,32 @@ class MyDecisionTreeRegressor():
         '''
         answer = []
         for i in range(X.shape[0]):
+            track = []
             instance = X[i, :]
-            pred = explore(self.root, instance)
+            pred = explore(self.root, instance, track)
             answer.append(pred)
         return np.array(answer)
+
+    def explore_track(self, X):
+        '''
+        :param X: Feature data, type: numpy array, shape: (N, num_feature)
+        :return: y_pred: Predicted label, type: numpy array, shape: (N,)
+        '''
+        answer = []
+        tree_result = []
+        for i in range(X.shape[0]):
+            track = []
+            instance = X[i, :]
+            pred = explore(self.root, instance, track)
+            answer.append(''.join(track))
+            tree_result.append(pred)
+        temp_dict = defaultdict(list)
+        for index, item in enumerate(answer):
+            temp_dict[item].append(index)
+        for k, v in temp_dict.items():
+            self.track_dict[k]['index'] = v
+            #print(answer.index(k))
+            self.track_dict[k]['c'] = tree_result[answer.index(k)]
 
     def get_model_string(self):
         model_dict = self.root
@@ -169,7 +213,7 @@ if __name__ == '__main__':
             #print('test model_string is\n{}'.format(test_model_string))
             #print('length model: {}, length test: {}'.format(len(str(model_string)), len(str(test_model_string))))
             #print(str(model_string) == str(test_model_string))
-            #print(operator.eq(model_string, test_model_string))
+            print(operator.eq(model_string, test_model_string))
             #print('Model same? {}'.format(operator.eq(model_string, test_model_string)))
 
             #sometimes although the some node is different, but the structure of leaf node is the same!
